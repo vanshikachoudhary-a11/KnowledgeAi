@@ -1,0 +1,2 @@
+import { Router } from 'express'; import { createChat, deleteChat, getChatMessages, listChats, sendMessage } from '../controllers/chatController.js'; import { requireAuth } from '../middleware/authMiddleware.js';
+const router = Router(); router.use(requireAuth); router.route('/').get(listChats).post(createChat); router.route('/:id').get(getChatMessages).delete(deleteChat); router.post('/:id/messages', sendMessage); export default router;

@@ -1,0 +1,2 @@
+import { Router } from 'express'; import { deleteDocument, getDocument, listDocuments, uploadDocument } from '../controllers/documentController.js'; import { requireAuth } from '../middleware/authMiddleware.js'; import { uploadPdf } from '../middleware/uploadMiddleware.js';
+const router = Router(); router.use(requireAuth); router.route('/').get(listDocuments).post(uploadPdf, uploadDocument); router.route('/:id').get(getDocument).delete(deleteDocument); export default router;

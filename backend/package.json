@@ -1,0 +1,11 @@
+{
+  "name": "knowledge-ai-backend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": { "dev": "node --watch src/server.js", "start": "node src/server.js", "test": "node --test", "lint": "eslint src tests" },
+  "dependencies": {
+    "bcrypt": "latest", "cors": "latest", "dotenv": "latest", "express": "latest", "express-rate-limit": "latest", "helmet": "latest", "jsonwebtoken": "latest", "mongodb": "latest", "multer": "latest", "pdf-parse": "latest", "zod": "latest"
+  },
+  "devDependencies": { "eslint": "latest", "supertest": "latest" }
+}

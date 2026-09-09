@@ -1,0 +1,5 @@
+import { useState } from 'react';
+import { useAuth } from '../hooks/useAuth';
+import Button from '../components/Button';
+
+export default function SettingsPage() { const { user } = useAuth(); const [saved, setSaved] = useState(false); return <><header className="page-header"><div><span className="eyebrow">PREFERENCES</span><h1>Settings</h1><p>Manage your workspace and response preferences.</p></div></header><section className="settings-card"><h2>Profile</h2><label>Display name<input defaultValue={user?.name} /></label><label>Email<input defaultValue={user?.email} type="email" /></label><Button onClick={() => setSaved(true)}>{saved ? 'Saved ✓' : 'Save changes'}</Button></section><section className="settings-card"><h2>Answer preferences</h2><label className="toggle-row"><span><strong>Show source citations</strong><small>Attach document and page references to answers.</small></span><input type="checkbox" defaultChecked /></label><label className="toggle-row"><span><strong>Stream responses</strong><small>Show answers as they are generated.</small></span><input type="checkbox" defaultChecked /></label></section></>; }
