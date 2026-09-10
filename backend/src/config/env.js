@@ -12,7 +12,7 @@ export const env = Object.freeze({
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
   clientUrl: process.env.CLIENT_URL || 'http://localhost:5173',
   maxFileSize: Number(process.env.MAX_FILE_SIZE_MB || 10) * 1024 * 1024,
-  openAiKey: process.env.OPENAI_API_KEY || '',
-  embeddingModel: process.env.OPENAI_EMBEDDING_MODEL || 'text-embedding-3-small',
-  chatModel: process.env.OPENAI_CHAT_MODEL || 'gpt-4o-mini',
+  geminiKey: process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY || '',
+  embeddingModel: process.env.GEMINI_EMBEDDING_MODEL || 'gemini-embedding-001',
+  chatModel: process.env.GEMINI_CHAT_MODEL || 'gemini-3.6-flash',
 });

@@ -1,10 +1,15 @@
 import fs from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { ObjectId } from 'mongodb';
 import { PDFParse } from 'pdf-parse';
 import { documents } from '../models/Document.js';
 import { chunks } from '../models/Chunk.js';
 import { chunkText } from '../utils/chunkText.js';
-import { createEmbedding } from './embeddingService.js';
+import { createEmbeddings } from './embeddingService.js';
+
+const uploadsDirectory = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../uploads');
+const embeddingBatchSize = 20;
 
 export async function createDocument({ userId, file }) {
   const document = { userId: new ObjectId(userId), filename: file.filename, originalName: file.originalname, mimeType: file.mimetype, size: file.size, storageUrl: `/uploads/${file.filename}`, status: 'uploaded', pageCount: 0, createdAt: new Date(), updatedAt: new Date() };
@@ -12,20 +17,28 @@ export async function createDocument({ userId, file }) {
   return { ...document, _id: insertedId };
 }
 export async function processDocument(document) {
-  await documents().updateOne({ _id: document._id }, { $set: { status: 'processing', updatedAt: new Date() } });
   try {
-    const parser = new PDFParse({ data: await fs.readFile(`uploads/${document.filename}`) });
-    const [result, info] = await Promise.all([parser.getText(), parser.getInfo({ parsePageInfo: true })]);
+    await documents().updateOne({ _id: document._id }, { $set: { status: 'processing', processingError: null, updatedAt: new Date() } });
+    await chunks().deleteMany({ documentId: document._id });
+    const parser = new PDFParse({ data: await fs.readFile(path.join(uploadsDirectory, document.filename)) });
+    const result = await parser.getText();
     await parser.destroy();
-    const textChunks = chunkText(result.text);
     const chunkRecords = [];
-    for (let index = 0; index < textChunks.length; index += 1) {
-      const text = textChunks[index];
-      const embedding = await createEmbedding(text);
-      chunkRecords.push({ userId: document.userId, documentId: document._id, text, pageNumber: null, chunkIndex: index, embedding, createdAt: new Date() });
+    let chunkIndex = 0;
+    for (const page of result.pages) {
+      const cleanText = page.text.replace(/\u0000/g, '').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+      const pageChunks = chunkText(cleanText).map((text) => ({ text, pageNumber: page.num, chunkIndex: chunkIndex++ }));
+      for (let start = 0; start < pageChunks.length; start += embeddingBatchSize) {
+        const batch = pageChunks.slice(start, start + embeddingBatchSize);
+        const embeddings = await createEmbeddings(batch.map(({ text }) => text));
+        batch.forEach((chunk, index) => chunkRecords.push({ userId: document.userId, documentId: document._id, ...chunk, embedding: embeddings[index], createdAt: new Date() }));
+      }
     }
     if (chunkRecords.length) await chunks().insertMany(chunkRecords);
-    await documents().updateOne({ _id: document._id }, { $set: { status: 'ready', pageCount: info.total || 0, updatedAt: new Date() } });
-  } catch (error) { await documents().updateOne({ _id: document._id }, { $set: { status: 'failed', processingError: error.message, updatedAt: new Date() } }); }
+    await documents().updateOne({ _id: document._id }, { $set: { status: 'ready', pageCount: result.total, updatedAt: new Date() } });
+  } catch (error) {
+    await chunks().deleteMany({ documentId: document._id }).catch(() => undefined);
+    await documents().updateOne({ _id: document._id }, { $set: { status: 'failed', processingError: error.message, updatedAt: new Date() } }).catch(() => undefined);
+  }
 }
-export async function removeDocument(document) { await chunks().deleteMany({ documentId: document._id }); await documents().deleteOne({ _id: document._id }); await fs.unlink(`uploads/${document.filename}`).catch(() => undefined); }
+export async function removeDocument(document) { await chunks().deleteMany({ documentId: document._id }); await documents().deleteOne({ _id: document._id }); await fs.unlink(path.join(uploadsDirectory, document.filename)).catch(() => undefined); }

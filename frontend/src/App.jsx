@@ -10,7 +10,8 @@ import SettingsPage from './pages/SettingsPage';
 import { useAuth } from './hooks/useAuth';
 
 function ProtectedLayout() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
+  if (isLoading) return null;
   return isAuthenticated ? <DashboardLayout /> : <Navigate to="/login" replace />;
 }
 

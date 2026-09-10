@@ -1,6 +1,8 @@
 import { formatDate } from '../utils/formatDate';
 
-export default function FileCard({ document }) {
+export default function FileCard({ document, onDelete, onRetry }) {
   const status = document.status || 'ready';
-  return <article className="file-card"><div className="file-icon">PDF</div><div className="file-details"><strong>{document.name}</strong><span>{document.size} · {formatDate(document.updatedAt)}</span></div><span className={`status status--${status}`}>{status === 'ready' ? 'Ready' : 'Processing'}</span><button className="icon-button" aria-label={`More options for ${document.name}`}>•••</button></article>;
+  const name = document.name || document.originalName;
+  const size = typeof document.size === 'number' ? `${(document.size / 1024 / 1024).toFixed(1)} MB` : document.size;
+  return <article className="file-card"><div className="file-icon">PDF</div><div className="file-details"><strong>{name}</strong><span>{size} · {formatDate(document.updatedAt)}{status === 'failed' && document.processingError ? ` · ${document.processingError}` : ''}</span></div><span className={`status status--${status}`}>{status === 'ready' ? 'Ready' : status === 'failed' ? 'Failed' : 'Processing'}</span>{status === 'failed' && onRetry && <button className="icon-button" onClick={() => onRetry(document._id)} aria-label={`Retry ${name}`}>↻</button>}{onDelete && <button className="icon-button" onClick={() => onDelete(document._id)} aria-label={`Delete ${name}`}>×</button>}</article>;
 }
