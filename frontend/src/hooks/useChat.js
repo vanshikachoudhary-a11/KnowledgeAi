@@ -1,55 +1,18 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { chatService } from '../services/chatService';
+import { documentService } from '../services/documentService';
 
-const starterMessages = [{
-  id: 'welcome',
-  role: 'assistant',
-  content: 'I’m ready to help you find answers across your knowledge base. Ask me about one of your documents.',
-  sources: [],
-}];
-
+const welcome = [{ id: 'welcome', role: 'assistant', content: 'I’m ready to help you find answers across your knowledge base. Select a document or search all ready documents.', sources: [] }];
 export function useChat() {
-  const [messages, setMessages] = useState(starterMessages);
-  const [isStreaming, setIsStreaming] = useState(false);
-  const [chatId, setChatId] = useState(null);
-  const [error, setError] = useState('');
-  const abortRef = useRef(null);
-
-  useEffect(() => {
-    const createChat = async () => {
-      try {
-        const { data } = await chatService.create('New conversation');
-        setChatId(data.chat._id);
-      } catch (requestError) {
-        setError(requestError.message);
-      }
-    };
-    createChat();
-    return () => abortRef.current?.abort();
-  }, []);
-
-  const sendMessage = async (content) => {
-    if (!chatId) return;
-    const userMessage = { id: crypto.randomUUID(), role: 'user', content };
-    setMessages((current) => [...current, userMessage]);
-    setIsStreaming(true);
-    setError('');
-    const streamedMessage = { id: crypto.randomUUID(), role: 'assistant', content: '', sources: [] };
-    setMessages((current) => [...current, streamedMessage]);
-    try {
-      abortRef.current = new AbortController();
-      const savedMessage = await chatService.streamMessage(chatId, content, (token) => setMessages((current) => current.map((item) => item.id === streamedMessage.id ? { ...item, content: item.content + token } : item)), abortRef.current.signal);
-      if (savedMessage) setMessages((current) => current.map((item) => item.id === streamedMessage.id ? { ...savedMessage, id: savedMessage._id } : item));
-    } catch (requestError) {
-      if (requestError.name !== 'AbortError') {
-        setMessages((current) => current.filter((item) => item.id !== streamedMessage.id || item.content));
-        setError(requestError.message);
-      }
-    } finally {
-      abortRef.current = null;
-      setIsStreaming(false);
-    }
-  };
-
-  return { messages, isStreaming, sendMessage, error, isReady: Boolean(chatId) };
+  const [messages, setMessages] = useState(welcome); const [chats, setChats] = useState([]); const [documents, setDocuments] = useState([]); const [chat, setChat] = useState(null); const [isStreaming, setIsStreaming] = useState(false); const [error, setError] = useState(''); const abortRef = useRef(null);
+  const refreshDocuments = useCallback(async () => { const { data } = await documentService.list(); setDocuments(data.documents); }, []);
+  const loadChats = useCallback(async () => { const { data } = await chatService.list(); setChats(data.chats); return data.chats; }, []);
+  const openChat = useCallback(async (chatId) => { setError(''); const { data } = await chatService.messages(chatId); setChat(data.chat); setMessages(data.messages.length ? data.messages.map((message) => ({ ...message, id: message._id })) : welcome); }, []);
+  const newChat = useCallback(async (documentIds = []) => { setError(''); const { data } = await chatService.create('New conversation', documentIds); setChat(data.chat); setMessages(welcome); setChats((current) => [data.chat, ...current]); return data.chat; }, []);
+  useEffect(() => { Promise.all([loadChats(), refreshDocuments()]).then(async ([loadedChats]) => { if (loadedChats[0]) await openChat(loadedChats[0]._id); else await newChat(); }).catch((requestError) => setError(requestError.message)); return () => abortRef.current?.abort(); }, [loadChats, newChat, openChat, refreshDocuments]);
+  useEffect(() => { if (!documents.some((document) => ['uploaded', 'processing'].includes(document.status))) return undefined; const timer = window.setInterval(() => refreshDocuments().catch(() => undefined), 2500); return () => window.clearInterval(timer); }, [documents, refreshDocuments]);
+  const selectDocuments = async (documentIds) => { if (!isStreaming) await newChat(documentIds); };
+  const deleteChat = async (chatId) => { await chatService.remove(chatId); setChats((current) => current.filter((item) => item._id !== chatId)); if (chat?._id === chatId) await newChat([]); };
+  const sendMessage = async (content) => { if (!chat || isStreaming) return; const ids = chat.documentIds || (chat.documentId ? [chat.documentId] : []); const unavailable = ids.map((id) => documents.find((document) => document._id === id)).find((document) => document?.status !== 'ready'); if (unavailable) { setError(unavailable.status === 'failed' ? unavailable.processingError || 'This document could not be processed.' : 'Your document is still being processed. Please wait.'); return; } const userMessage = { id: crypto.randomUUID(), role: 'user', content }; const streamedMessage = { id: crypto.randomUUID(), role: 'assistant', content: '', sources: [] }; setMessages((current) => [...current, userMessage, streamedMessage]); setIsStreaming(true); setError(''); try { abortRef.current = new AbortController(); const saved = await chatService.streamMessage(chat._id, content, (token) => setMessages((current) => current.map((item) => item.id === streamedMessage.id ? { ...item, content: item.content + token } : item)), abortRef.current.signal); if (saved?.message) setMessages((current) => current.map((item) => item.id === streamedMessage.id ? { ...saved.message, id: saved.message._id } : item)); if (saved?.chat) { setChat(saved.chat); setChats((current) => [saved.chat, ...current.filter((item) => item._id !== saved.chat._id)]); } } catch (requestError) { if (requestError.name !== 'AbortError') { setMessages((current) => current.filter((item) => item.id !== streamedMessage.id || item.content)); setError(requestError.message); } } finally { abortRef.current = null; setIsStreaming(false); } };
+  return { messages, chats, documents, chat, isStreaming, error, openChat, newChat, selectDocuments, deleteChat, sendMessage, isReady: Boolean(chat) };
 }

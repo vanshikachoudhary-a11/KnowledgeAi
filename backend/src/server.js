@@ -9,6 +9,7 @@ import documentRoutes from './routes/documentRoutes.js';
 import chatRoutes from './routes/chatRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import { errorHandler, notFound } from './middleware/errorMiddleware.js';
+import { recoverInterruptedDocuments } from './services/documentService.js';
 
 export const app = express();
 app.use(helmet());
@@ -24,5 +25,5 @@ app.use(notFound);
 app.use(errorHandler);
 
 if (process.env.NODE_ENV !== 'test') {
-  connectDatabase().then(() => app.listen(env.port, () => console.log(`KnowledgeAI API listening on port ${env.port}`))).catch((error) => { console.error('Database connection failed:', error.message); process.exit(1); });
+  connectDatabase().then(async () => { await recoverInterruptedDocuments(); app.listen(env.port, () => console.log(`KnowledgeAI API listening on port ${env.port}`)); }).catch((error) => { console.error('Database connection failed:', error.message); process.exit(1); });
 }

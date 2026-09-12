@@ -12,7 +12,9 @@ export async function connectDatabase() {
     database.collection('users').createIndex({ email: 1 }, { unique: true }),
     database.collection('documents').createIndex({ userId: 1, createdAt: -1 }),
     database.collection('chunks').createIndex({ userId: 1, documentId: 1 }),
+    database.collection('chunks').createIndex({ documentId: 1, chunkIndex: 1 }),
     database.collection('chats').createIndex({ userId: 1, updatedAt: -1 }),
+    database.collection('chats').createIndex({ userId: 1, documentIds: 1 }),
     database.collection('messages').createIndex({ chatId: 1, createdAt: 1 }),
   ]);
   return database;

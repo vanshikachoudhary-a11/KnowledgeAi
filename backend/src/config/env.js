@@ -15,4 +15,8 @@ export const env = Object.freeze({
   geminiKey: process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY || '',
   embeddingModel: process.env.GEMINI_EMBEDDING_MODEL || 'gemini-embedding-001',
   chatModel: process.env.GEMINI_CHAT_MODEL || 'gemini-3.6-flash',
+  ocrModel: process.env.GEMINI_OCR_MODEL || process.env.GEMINI_CHAT_MODEL || 'gemini-3.6-flash',
+  ocrTextThreshold: Number(process.env.OCR_TEXT_THRESHOLD || 80),
+  ocrMaxPages: Number(process.env.OCR_MAX_PAGES || 50),
+  pdftoppmPath: process.env.PDFTOPPM_PATH || 'pdftoppm',
 });
